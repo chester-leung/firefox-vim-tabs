@@ -79,6 +79,7 @@ STATE = """
     selected: tabs.indexOf(gBrowser.selectedTab),
     expanded: ui.launcherExpanded,
     count: tabs.length,
+    names: tabs.map(t => t.linkedBrowser.contentTitle.split(":")[0]).join(" "),
   };
 """
 
@@ -194,6 +195,30 @@ def main():
     urlbar = m.js("return [gURLBar.value, gURLBar.focused]")
     check("cmd+l: exits nav mode, URL bar takes typing", {**s, "urlbar": urlbar},
           active=False, cursor=-1, expanded=False, urlbar=["abc", True])
+
+    # dd closes the tab under the cursor and stays in nav mode.
+    keys(m, ["Control", "z"])
+    m.js("const resolve = arguments[0]; setTimeout(resolve, 500);")
+    keys(m, ["k"], ["d"], ["d"])
+    m.js("const resolve = arguments[0]; setTimeout(resolve, 800);")
+    check("dd: closes cursor tab, cursor on the tab below, still in nav mode",
+          m.js(STATE), active=True, count=4, cursor=2, selected=2,
+          names="t0 t1 t3 t4")
+
+    keys(m, ["d"], ["d"])
+    m.js("const resolve = arguments[0]; setTimeout(resolve, 800);")
+    check("dd on the active tab: closes it, still in nav mode", m.js(STATE),
+          active=True, count=3, cursor=2, names="t0 t1 t4")
+
+    keys(m, ["d"])
+    m.js("const resolve = arguments[0]; setTimeout(resolve, 700);")
+    keys(m, ["d"])
+    m.js("const resolve = arguments[0]; setTimeout(resolve, 500);")
+    check("d ... d too slow: nothing closed", m.js(STATE), active=True, count=3)
+
+    keys(m, ["Escape"])
+    m.js("const resolve = arguments[0]; setTimeout(resolve, 300);")
+    check("esc after dd: exits", m.js(STATE), active=False, count=3)
 
     print("\nPASS" if not failures else f"\n{failures} FAILED")
     sys.exit(1 if failures else 0)

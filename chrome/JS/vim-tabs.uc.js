@@ -4,14 +4,15 @@
 // ==/UserScript==
 
 // Ctrl+Z enters nav mode: the vertical tab strip expands and a cursor appears on
-// the current tab. j/k move the cursor, gg/G jump to the first/last tab, Enter
-// switches to the tab under the cursor, Esc or Ctrl+Z again cancels. Moving the
-// cursor never switches tabs by itself.
+// the current tab. j/k move the cursor, gg/G jump to the first/last tab, dd
+// closes the tab under the cursor, Enter switches to it, Esc or Ctrl+Z again
+// cancels. Moving the cursor never switches tabs by itself.
 
 (function () {
   const CURSOR_ATTR = "vimtabs-cursor";
   const ACTIVE_ATTR = "vimtabs-active";
-  const GG_TIMEOUT_MS = 500;
+  // Max gap between the two keys of gg / dd.
+  const PREFIX_TIMEOUT_MS = 500;
 
   const CSS = `
     .tabbrowser-tab[${CURSOR_ATTR}] > .tab-stack > .tab-background {
@@ -25,15 +26,18 @@
 
   let active = false;
   let cursor = null;
-  let lastGAt = 0;
+  let pendingKey = null;
+  let pendingAt = 0;
   let expandedByUs = false;
   let focusBefore = null;
+  // True while Firefox switches away from an active tab we're closing.
+  let switchingAfterClose = false;
 
   function navigableTabs() {
     // Pinned tabs first, then unpinned in visual order; skips hidden tabs and
     // tabs inside collapsed groups.
-    return gBrowser.tabContainer.ariaFocusableItems.filter(el =>
-      el.classList.contains("tabbrowser-tab")
+    return gBrowser.tabContainer.ariaFocusableItems.filter(
+      el => el.classList.contains("tabbrowser-tab") && !el.closing
     );
   }
 
@@ -47,6 +51,21 @@
     if (!tab.pinned) {
       gBrowser.tabContainer.arrowScrollbox.ensureElementIsVisible(tab, true);
     }
+  }
+
+  function closeCursorTab() {
+    // Stays in nav mode; onTabClose moves the cursor to the tab below.
+    if (!cursor) {
+      return;
+    }
+    if (cursor.selected) {
+      // Firefox switches to another tab (moving focus into its page) before
+      // TabClose fires, so flag it up front.
+      switchingAfterClose = true;
+      // Fallback in case TabSwitchDone never arrives.
+      setTimeout(onTabSwitchDone, 1000);
+    }
+    gBrowser.removeTab(cursor, { animate: true });
   }
 
   function moveCursor(delta) {
@@ -84,7 +103,8 @@
       return;
     }
     active = true;
-    lastGAt = 0;
+    pendingKey = null;
+    switchingAfterClose = false;
     focusBefore = Services.focus.focusedElement;
     // Pull focus out of the page so our keys never reach content.
     Services.focus.clearFocus(window);
@@ -94,6 +114,7 @@
     window.addEventListener("mousedown", onMouseDown, true);
     window.addEventListener("deactivate", onDeactivate);
     window.addEventListener("focusin", onFocusIn, true);
+    window.addEventListener("TabSwitchDone", onTabSwitchDone);
     gBrowser.tabContainer.addEventListener("TabSelect", onTabSelect);
     gBrowser.tabContainer.addEventListener("TabClose", onTabClose);
     setCursor(gBrowser.selectedTab);
@@ -105,11 +126,13 @@
       return;
     }
     active = false;
+    switchingAfterClose = false;
     window.removeEventListener("keydown", onKeyDown, true);
     window.removeEventListener("keypress", swallow, true);
     window.removeEventListener("mousedown", onMouseDown, true);
     window.removeEventListener("deactivate", onDeactivate);
     window.removeEventListener("focusin", onFocusIn, true);
+    window.removeEventListener("TabSwitchDone", onTabSwitchDone);
     gBrowser.tabContainer.removeEventListener("TabSelect", onTabSelect);
     gBrowser.tabContainer.removeEventListener("TabClose", onTabClose);
     document.documentElement.removeAttribute(ACTIVE_ATTR);
@@ -153,16 +176,21 @@
     }
     swallow(e);
 
-    if (e.key === "g") {
-      if (lastGAt && e.timeStamp - lastGAt < GG_TIMEOUT_MS) {
-        lastGAt = 0;
-        setCursor(navigableTabs()[0]);
+    if (e.key === "g" || e.key === "d") {
+      if (pendingKey === e.key && e.timeStamp - pendingAt < PREFIX_TIMEOUT_MS) {
+        pendingKey = null;
+        if (e.key === "g") {
+          setCursor(navigableTabs()[0]);
+        } else {
+          closeCursorTab();
+        }
       } else {
-        lastGAt = e.timeStamp;
+        pendingKey = e.key;
+        pendingAt = e.timeStamp;
       }
       return;
     }
-    lastGAt = 0;
+    pendingKey = null;
 
     switch (e.key) {
       case "j":
@@ -195,24 +223,43 @@
   }
 
   function onFocusIn() {
+    if (switchingAfterClose) {
+      return;
+    }
     // Focus moved somewhere on purpose, e.g. Cmd+L to the URL bar. Leave it
     // there; otherwise we'd keep swallowing the keys meant for it.
     exit({ restoreFocus: false });
   }
 
   function onTabSelect() {
+    // dd on the active tab makes Firefox switch to another one; that shouldn't
+    // end nav mode.
+    if (switchingAfterClose) {
+      return;
+    }
     // Something other than Enter switched tabs, e.g. Cmd+T.
     exit();
+  }
+
+  function onTabSwitchDone() {
+    if (!active || !switchingAfterClose) {
+      return;
+    }
+    switchingAfterClose = false;
+    // The switch focused the new tab's page; take focus back so keys stay ours.
+    Services.focus.clearFocus(window);
   }
 
   function onTabClose(e) {
     if (e.target !== cursor) {
       return;
     }
-    const tabs = navigableTabs();
-    const i = tabs.indexOf(cursor);
-    const remaining = tabs.filter(t => t !== cursor);
-    setCursor(remaining[Math.min(i, remaining.length - 1)]);
+    // Move to the next navigable tab below, else the last one. gBrowser.tabs
+    // still includes the closing tab; navigableTabs() already doesn't.
+    const tabs = Array.from(gBrowser.tabs);
+    const nav = navigableTabs();
+    const below = tabs.slice(tabs.indexOf(cursor) + 1).find(t => nav.includes(t));
+    setCursor(below ?? nav.at(-1));
   }
 
   function init() {
