@@ -64,7 +64,7 @@ KEY_HELPERS = """
 
 
 def keys(m, *chords):
-    """Each chord is a list like ["Control", "z"] or ["j"]."""
+    """Each chord is a list like ["Meta", "e"] or ["j"]."""
     m.js(KEY_HELPERS + "for (const c of arguments[0]) press(c);", [list(c) for c in chords])
 
 
@@ -128,10 +128,10 @@ def main():
     check("script loaded, 5 tabs, launcher collapsed", s, loaded=True, count=5,
           active=False, expanded=False)
 
-    keys(m, ["Control", "z"])
+    keys(m, ["Meta", "e"])
     m.js("const resolve = arguments[0]; setTimeout(resolve, 500);")
     s = m.js(STATE)
-    check("ctrl+z: nav mode, cursor on current tab, launcher expanded", s,
+    check("cmd+e: nav mode, cursor on current tab, launcher expanded", s,
           active=True, cursor=1, selected=1, expanded=True)
 
     keys(m, ["j"], ["j"])
@@ -167,16 +167,16 @@ def main():
     focused = m.js("return Services.focus.focusedElement === gBrowser.selectedBrowser")
     check("enter: focus back in page", {"focused": focused}, focused=True)
 
-    keys(m, ["Control", "z"], ["k"], ["Escape"])
+    keys(m, ["Meta", "e"], ["k"], ["Escape"])
     m.js("const resolve = arguments[0]; setTimeout(resolve, 500);")
     check("esc: exits without switching", m.js(STATE), active=False, selected=3,
           expanded=False)
 
-    keys(m, ["Control", "z"])
+    keys(m, ["Meta", "e"])
     m.js("const resolve = arguments[0]; setTimeout(resolve, 300);")
-    keys(m, ["Control", "z"])
+    keys(m, ["Meta", "e"])
     m.js("const resolve = arguments[0]; setTimeout(resolve, 500);")
-    check("ctrl+z twice: toggles off", m.js(STATE), active=False, selected=3,
+    check("cmd+e twice: toggles off", m.js(STATE), active=False, selected=3,
           expanded=False)
 
     # Typing in a page still works after all that.
@@ -186,9 +186,9 @@ def main():
     check("keys reach the page again after exit", {"t": title}, t="t3:1")
 
     # Cmd+L from nav mode hands the keyboard to the URL bar.
-    keys(m, ["Control", "z"])
+    keys(m, ["Meta", "e"])
     m.js("const resolve = arguments[0]; setTimeout(resolve, 500);")
-    check("ctrl+z again: nav mode", m.js(STATE), active=True)
+    check("cmd+e again: nav mode", m.js(STATE), active=True)
     keys(m, ["Meta", "l"], ["a"], ["b"], ["c"])
     m.js("const resolve = arguments[0]; setTimeout(resolve, 300);")
     s = m.js(STATE)
@@ -197,7 +197,7 @@ def main():
           active=False, cursor=-1, expanded=False, urlbar=["abc", True])
 
     # dd closes the tab under the cursor and stays in nav mode.
-    keys(m, ["Control", "z"])
+    keys(m, ["Meta", "e"])
     m.js("const resolve = arguments[0]; setTimeout(resolve, 500);")
     keys(m, ["k"], ["d"], ["d"])
     m.js("const resolve = arguments[0]; setTimeout(resolve, 800);")

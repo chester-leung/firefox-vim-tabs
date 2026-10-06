@@ -2,21 +2,21 @@
 
 Vim-style keyboard navigation for Firefox's native vertical tabs.
 
-![Demo: Ctrl+Z opens the tab cursor, j/k/gg/G move it, Enter switches](docs/demo.gif)
+![Demo: Cmd+E opens the tab cursor, j/k/gg/G move it, Enter switches](docs/demo.gif)
 
 | Key | Action |
 | --- | --- |
-| `Ctrl+Z` | Enter nav mode: the vertical tabs expand, and a cursor appears on the current tab |
+| `Cmd+E` | Enter nav mode: the vertical tabs expand, and a cursor appears on the current tab |
 | `j` / `k` (or arrows) | Move the cursor down / up without switching tabs |
 | `gg` / `G` | Jump to the first / last tab |
 | `dd` | Close the tab under the cursor (stays in nav mode; cursor moves to the tab below) |
 | `Enter` | Switch to the tab under the cursor and exit |
-| `Esc` / `Ctrl+Z` | Exit without switching |
+| `Esc` / `Cmd+E` | Exit without switching |
 
 Clicking anywhere, switching windows, or switching tabs some other way (such as Cmd+T) also exits nav mode.
 Pinned tabs come first, in the same order as the sidebar. Tabs inside collapsed groups are skipped.
 
-`Ctrl+Z` replaces Firefox's built-in "toggle sidebar" shortcut on macOS, which uses the same keys.
+`Cmd+E` replaces Firefox's built-in "use selection for find" shortcut on macOS, which uses the same keys.
 
 ## How it works
 

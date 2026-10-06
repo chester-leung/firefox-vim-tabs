@@ -3,9 +3,9 @@
 // @description    Vim-style keyboard navigation for Firefox's vertical tabs
 // ==/UserScript==
 
-// Ctrl+Z enters nav mode: the vertical tab strip expands and a cursor appears on
+// Cmd+E enters nav mode: the vertical tab strip expands and a cursor appears on
 // the current tab. j/k move the cursor, gg/G jump to the first/last tab, dd
-// closes the tab under the cursor, Enter switches to it, Esc or Ctrl+Z again
+// closes the tab under the cursor, Enter switches to it, Esc or Cmd+E again
 // cancels. Moving the cursor never switches tabs by itself.
 
 (function () {
@@ -169,7 +169,7 @@
   }
 
   function onKeyDown(e) {
-    // Let modified keys through: Ctrl+Z reaches our <key> and toggles off, and
+    // Let modified keys through: Cmd+E reaches our <key> and toggles off, and
     // Cmd shortcuts keep working.
     if (e.ctrlKey || e.metaKey || e.altKey) {
       return;
@@ -273,20 +273,19 @@
     command.addEventListener("command", toggle);
     document.getElementById("mainCommandSet").append(command);
 
-    // Firefox binds Ctrl+Z to "toggle sidebar" on macOS, and the built-in key
-    // wins over ours, so switch it off. Nav mode expands the sidebar anyway.
-    document.getElementById("toggleSidebarKb")?.setAttribute("disabled", "true");
+    // Firefox binds Cmd+E to "use selection for find" on macOS, and the
+    // built-in key wins over ours, so switch it off.
+    document.getElementById("key_findSelection")?.setAttribute("disabled", "true");
 
     // A fresh keyset so the key is registered; keys appended to an existing
     // keyset after startup are not always picked up. reserved="true" keeps web
-    // pages from swallowing the shortcut. On macOS "control" is the real Ctrl
-    // key ("accel" would be Cmd).
+    // pages from swallowing the shortcut. "accel" is Cmd on macOS.
     const keyset = document.createXULElement("keyset");
     keyset.id = "vimTabsKeyset";
     const key = document.createXULElement("key");
     key.id = "key_vimTabsToggle";
-    key.setAttribute("key", "z");
-    key.setAttribute("modifiers", "control");
+    key.setAttribute("key", "e");
+    key.setAttribute("modifiers", "accel");
     key.setAttribute("command", command.id);
     key.setAttribute("reserved", "true");
     keyset.append(key);
