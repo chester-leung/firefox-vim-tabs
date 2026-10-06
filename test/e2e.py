@@ -49,6 +49,7 @@ KEY_HELPERS = """
     .createInstance(Ci.nsITextInputProcessor);
   tip.beginInputTransactionForTests(window);
   const named = { Control: ["ControlLeft", 17], Shift: ["ShiftLeft", 16],
+                  Meta: ["MetaLeft", 224],
                   Enter: ["Enter", 13], Escape: ["Escape", 27] };
   function ev(key) {
     const [code, keyCode] = named[key] ||
@@ -182,6 +183,17 @@ def main():
     m.js("const resolve = arguments[0]; setTimeout(resolve, 300);")
     title = m.js("return gBrowser.selectedBrowser.contentTitle")
     check("keys reach the page again after exit", {"t": title}, t="t3:1")
+
+    # Cmd+L from nav mode hands the keyboard to the URL bar.
+    keys(m, ["Control", "z"])
+    m.js("const resolve = arguments[0]; setTimeout(resolve, 500);")
+    check("ctrl+z again: nav mode", m.js(STATE), active=True)
+    keys(m, ["Meta", "l"], ["a"], ["b"], ["c"])
+    m.js("const resolve = arguments[0]; setTimeout(resolve, 300);")
+    s = m.js(STATE)
+    urlbar = m.js("return [gURLBar.value, gURLBar.focused]")
+    check("cmd+l: exits nav mode, URL bar takes typing", {**s, "urlbar": urlbar},
+          active=False, cursor=-1, expanded=False, urlbar=["abc", True])
 
     print("\nPASS" if not failures else f"\n{failures} FAILED")
     sys.exit(1 if failures else 0)

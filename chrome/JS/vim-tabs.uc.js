@@ -93,13 +93,14 @@
     window.addEventListener("keypress", swallow, true);
     window.addEventListener("mousedown", onMouseDown, true);
     window.addEventListener("deactivate", onDeactivate);
+    window.addEventListener("focusin", onFocusIn, true);
     gBrowser.tabContainer.addEventListener("TabSelect", onTabSelect);
     gBrowser.tabContainer.addEventListener("TabClose", onTabClose);
     setCursor(gBrowser.selectedTab);
     await expandLauncher();
   }
 
-  function exit({ select = false } = {}) {
+  function exit({ select = false, restoreFocus = true } = {}) {
     if (!active) {
       return;
     }
@@ -108,6 +109,7 @@
     window.removeEventListener("keypress", swallow, true);
     window.removeEventListener("mousedown", onMouseDown, true);
     window.removeEventListener("deactivate", onDeactivate);
+    window.removeEventListener("focusin", onFocusIn, true);
     gBrowser.tabContainer.removeEventListener("TabSelect", onTabSelect);
     gBrowser.tabContainer.removeEventListener("TabClose", onTabClose);
     document.documentElement.removeAttribute(ACTIVE_ATTR);
@@ -119,11 +121,11 @@
 
     if (select && target && target !== gBrowser.selectedTab) {
       gBrowser.selectedTab = target;
-    } else if (focusBefore?.isConnected) {
+    } else if (restoreFocus && focusBefore?.isConnected) {
       focusBefore.focus();
     }
     focusBefore = null;
-    if (!Services.focus.focusedElement) {
+    if (restoreFocus && !Services.focus.focusedElement) {
       gBrowser.selectedBrowser.focus();
     }
   }
@@ -190,6 +192,12 @@
 
   function onDeactivate() {
     exit();
+  }
+
+  function onFocusIn() {
+    // Focus moved somewhere on purpose, e.g. Cmd+L to the URL bar. Leave it
+    // there; otherwise we'd keep swallowing the keys meant for it.
+    exit({ restoreFocus: false });
   }
 
   function onTabSelect() {
