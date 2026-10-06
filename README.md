@@ -2,6 +2,8 @@
 
 Vim-style keyboard navigation for Firefox's native vertical tabs.
 
+![Demo: Ctrl+Z opens the tab cursor, j/k/gg/G move it, Enter switches](docs/demo.gif)
+
 | Key | Action |
 | --- | --- |
 | `Ctrl+Z` | Enter nav mode: the vertical tabs expand, and a cursor appears on the current tab |
