@@ -56,3 +56,7 @@ python3 test/e2e.py 2830 shot.png
 Delete `config.js` and `defaults/pref/config-prefs.js` from
 `/Applications/Firefox.app/Contents/Resources/`, and delete
 `chrome/utils` and `chrome/JS/vim-tabs.uc.js` from each profile.
+
+## License
+
+MIT, except `vendor/fx-autoconfig/`, which is MPL-2.0 (see its `LICENSE`).
