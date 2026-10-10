@@ -4,14 +4,14 @@
 // ==/UserScript==
 
 // Cmd+E enters nav mode: the vertical tab strip expands and a cursor appears on
-// the current tab. j/k move the cursor, gg/G jump to the first/last tab, dd
-// closes the tab under the cursor, Enter switches to it, Esc or Cmd+E again
+// the current tab. j/k move the cursor, gg/G jump to the first/last tab, dd or
+// Vd closes the tab under the cursor, Enter switches to it, Esc or Cmd+E again
 // cancels. Moving the cursor never switches tabs by itself.
 
 (function () {
   const CURSOR_ATTR = "vimtabs-cursor";
   const ACTIVE_ATTR = "vimtabs-active";
-  // Max gap between the two keys of gg / dd.
+  // Max gap between the two keys of gg / dd / Vd.
   const PREFIX_TIMEOUT_MS = 500;
 
   const CSS = `
@@ -176,18 +176,20 @@
     }
     swallow(e);
 
-    if (e.key === "g" || e.key === "d") {
-      if (pendingKey === e.key && e.timeStamp - pendingAt < PREFIX_TIMEOUT_MS) {
-        pendingKey = null;
-        if (e.key === "g") {
-          setCursor(navigableTabs()[0]);
-        } else {
-          closeCursorTab();
-        }
-      } else {
-        pendingKey = e.key;
-        pendingAt = e.timeStamp;
-      }
+    // Shift on its own (as in V) shouldn't cancel a pending sequence.
+    if (e.key === "Shift") {
+      return;
+    }
+
+    const seq = pendingKey + e.key;
+    if (pendingKey && e.timeStamp - pendingAt < PREFIX_TIMEOUT_MS && seq in SEQUENCES) {
+      pendingKey = null;
+      SEQUENCES[seq]();
+      return;
+    }
+    if (PREFIX_KEYS.has(e.key)) {
+      pendingKey = e.key;
+      pendingAt = e.timeStamp;
       return;
     }
     pendingKey = null;
@@ -212,6 +214,14 @@
         break;
     }
   }
+
+  // Two-key commands; their first keys do nothing on their own.
+  const SEQUENCES = {
+    gg: () => setCursor(navigableTabs()[0]),
+    dd: closeCursorTab,
+    Vd: closeCursorTab,
+  };
+  const PREFIX_KEYS = new Set(Object.keys(SEQUENCES).map(seq => seq[0]));
 
   function onMouseDown() {
     // Any click (including on a tab) ends nav mode and proceeds normally.

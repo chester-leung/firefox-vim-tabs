@@ -216,9 +216,14 @@ def main():
     m.js("const resolve = arguments[0]; setTimeout(resolve, 500);")
     check("d ... d too slow: nothing closed", m.js(STATE), active=True, count=3)
 
+    keys(m, ["Shift", "V"], ["d"])
+    m.js("const resolve = arguments[0]; setTimeout(resolve, 800);")
+    check("Vd: closes cursor tab, still in nav mode", m.js(STATE),
+          active=True, count=2, names="t0 t1")
+
     keys(m, ["Escape"])
     m.js("const resolve = arguments[0]; setTimeout(resolve, 300);")
-    check("esc after dd: exits", m.js(STATE), active=False, count=3)
+    check("esc after dd: exits", m.js(STATE), active=False, count=2)
 
     print("\nPASS" if not failures else f"\n{failures} FAILED")
     sys.exit(1 if failures else 0)
