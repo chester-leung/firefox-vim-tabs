@@ -80,6 +80,8 @@ STATE = """
     expanded: ui.launcherExpanded,
     count: tabs.length,
     names: tabs.map(t => t.linkedBrowser.contentTitle.split(":")[0]).join(" "),
+    visual: tabs.filter(t => t.hasAttribute("vimtabs-visual"))
+      .map(t => t.linkedBrowser.contentTitle.split(":")[0]).join(" "),
   };
 """
 
@@ -216,10 +218,44 @@ def main():
     m.js("const resolve = arguments[0]; setTimeout(resolve, 500);")
     check("d ... d too slow: nothing closed", m.js(STATE), active=True, count=3)
 
+    # Visual mode: V marks a range, j/k extend it, d closes all of it.
+    m.js("""
+      const principal = Services.scriptSecurityManager.getSystemPrincipal();
+      for (let i = 5; i < 8; i++) {
+        gBrowser.addTab("data:text/html,<title>t" + i + ":0</title>",
+          { triggeringPrincipal: principal });
+      }
+    """)
+    m.js("const resolve = arguments[0]; setTimeout(resolve, 1500);")
+    check("tabs added below, still in nav mode", m.js(STATE), active=True,
+          cursor=2, names="t0 t1 t4 t5 t6 t7")
+
+    keys(m, ["Shift", "V"])
+    check("V: visual mode on the cursor tab", m.js(STATE), visual="t4")
+
+    keys(m, ["j"], ["j"])
+    check("V jj: range grows down", m.js(STATE), cursor=4, visual="t4 t5 t6")
+
+    keys(m, ["k"])
+    check("V jjk: range shrinks", m.js(STATE), cursor=3, visual="t4 t5")
+
+    keys(m, ["Escape"])
+    check("esc in visual: back to nav mode, nothing closed", m.js(STATE),
+          active=True, count=6, cursor=3, visual="")
+
+    keys(m, ["Shift", "V"], ["k"], ["k"])
+    check("V kk: range grows up past the anchor", m.js(STATE), cursor=1,
+          visual="t1 t4 t5")
+
+    keys(m, ["d"])
+    m.js("const resolve = arguments[0]; setTimeout(resolve, 800);")
+    check("d in visual: closes the range, cursor on the tab below", m.js(STATE),
+          active=True, count=3, cursor=1, names="t0 t6 t7", visual="")
+
     keys(m, ["Shift", "V"], ["d"])
     m.js("const resolve = arguments[0]; setTimeout(resolve, 800);")
-    check("Vd: closes cursor tab, still in nav mode", m.js(STATE),
-          active=True, count=2, names="t0 t1")
+    check("Vd: closes the cursor tab", m.js(STATE), active=True, count=2,
+          cursor=1, names="t0 t7")
 
     keys(m, ["Escape"])
     m.js("const resolve = arguments[0]; setTimeout(resolve, 300);")

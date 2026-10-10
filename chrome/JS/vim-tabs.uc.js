@@ -4,14 +4,18 @@
 // ==/UserScript==
 
 // Cmd+E enters nav mode: the vertical tab strip expands and a cursor appears on
-// the current tab. j/k move the cursor, gg/G jump to the first/last tab, dd or
-// Vd closes the tab under the cursor, Enter switches to it, Esc or Cmd+E again
+// the current tab. j/k move the cursor, gg/G jump to the first/last tab, dd
+// closes the tab under the cursor, Enter switches to it, Esc or Cmd+E again
 // cancels. Moving the cursor never switches tabs by itself.
+//
+// V starts visual mode: the tabs between where V was pressed and the cursor are
+// highlighted, d closes them all, and Esc or V again goes back to nav mode.
 
 (function () {
   const CURSOR_ATTR = "vimtabs-cursor";
   const ACTIVE_ATTR = "vimtabs-active";
-  // Max gap between the two keys of gg / dd / Vd.
+  const VISUAL_ATTR = "vimtabs-visual";
+  // Max gap between the two keys of gg / dd.
   const PREFIX_TIMEOUT_MS = 500;
 
   const CSS = `
@@ -22,10 +26,16 @@
     .tabbrowser-tab[${CURSOR_ATTR}]:not([selected]) > .tab-stack > .tab-background {
       background-color: color-mix(in srgb, currentColor 12%, transparent) !important;
     }
+    .tabbrowser-tab[${VISUAL_ATTR}] > .tab-stack > .tab-background {
+      background-color: color-mix(in srgb, AccentColor 30%, transparent) !important;
+    }
   `;
 
   let active = false;
   let cursor = null;
+  // Where V was pressed; null outside visual mode.
+  let anchor = null;
+  let visualTabs = [];
   let pendingKey = null;
   let pendingAt = 0;
   let expandedByUs = false;
@@ -51,21 +61,51 @@
     if (!tab.pinned) {
       gBrowser.tabContainer.arrowScrollbox.ensureElementIsVisible(tab, true);
     }
+    updateVisual();
   }
 
-  function closeCursorTab() {
-    // Stays in nav mode; onTabClose moves the cursor to the tab below.
-    if (!cursor) {
+  function updateVisual() {
+    for (const tab of visualTabs) {
+      tab.removeAttribute(VISUAL_ATTR);
+    }
+    visualTabs = [];
+    if (!anchor) {
       return;
     }
-    if (cursor.selected) {
+    const tabs = navigableTabs();
+    const [from, to] = [tabs.indexOf(anchor), tabs.indexOf(cursor)].sort((a, b) => a - b);
+    visualTabs = from < 0 ? [cursor] : tabs.slice(from, to + 1);
+    for (const tab of visualTabs) {
+      tab.setAttribute(VISUAL_ATTR, "");
+    }
+  }
+
+  function toggleVisual() {
+    anchor = anchor ? null : cursor;
+    updateVisual();
+  }
+
+  function closeTabs(toClose) {
+    // Stays in nav mode, with the cursor on the tab below the closed ones (or
+    // the last tab if there is none).
+    if (!toClose.length) {
+      return;
+    }
+    const tabs = navigableTabs();
+    const last = Math.max(...toClose.map(t => tabs.indexOf(t)));
+    const next =
+      tabs.slice(last + 1).find(t => !toClose.includes(t)) ??
+      tabs.findLast(t => !toClose.includes(t));
+    anchor = null;
+    setCursor(next);
+    if (toClose.some(t => t.selected)) {
       // Firefox switches to another tab (moving focus into its page) before
       // TabClose fires, so flag it up front.
       switchingAfterClose = true;
       // Fallback in case TabSwitchDone never arrives.
       setTimeout(onTabSwitchDone, 1000);
     }
-    gBrowser.removeTab(cursor, { animate: true });
+    gBrowser.removeTabs(toClose);
   }
 
   function moveCursor(delta) {
@@ -138,6 +178,8 @@
     document.documentElement.removeAttribute(ACTIVE_ATTR);
 
     const target = cursor;
+    anchor = null;
+    updateVisual();
     cursor?.removeAttribute(CURSOR_ATTR);
     cursor = null;
     restoreLauncher();
@@ -176,8 +218,14 @@
     }
     swallow(e);
 
-    // Shift on its own (as in V) shouldn't cancel a pending sequence.
+    // Shift on its own (as in G) shouldn't cancel a pending sequence.
     if (e.key === "Shift") {
+      return;
+    }
+
+    if (anchor && e.key === "d") {
+      pendingKey = null;
+      closeTabs(visualTabs);
       return;
     }
 
@@ -206,11 +254,18 @@
       case "G":
         setCursor(navigableTabs().at(-1));
         break;
+      case "V":
+        toggleVisual();
+        break;
       case "Enter":
         exit({ select: true });
         break;
       case "Escape":
-        exit();
+        if (anchor) {
+          toggleVisual();
+        } else {
+          exit();
+        }
         break;
     }
   }
@@ -218,8 +273,7 @@
   // Two-key commands; their first keys do nothing on their own.
   const SEQUENCES = {
     gg: () => setCursor(navigableTabs()[0]),
-    dd: closeCursorTab,
-    Vd: closeCursorTab,
+    dd: () => closeTabs([cursor]),
   };
   const PREFIX_KEYS = new Set(Object.keys(SEQUENCES).map(seq => seq[0]));
 
@@ -261,7 +315,12 @@
   }
 
   function onTabClose(e) {
+    if (e.target === anchor) {
+      // Closed from elsewhere; restart the selection at the cursor.
+      anchor = cursor === anchor ? null : cursor;
+    }
     if (e.target !== cursor) {
+      updateVisual();
       return;
     }
     // Move to the next navigable tab below, else the last one. gBrowser.tabs

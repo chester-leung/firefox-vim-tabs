@@ -9,7 +9,8 @@ Vim-style keyboard navigation for Firefox's native vertical tabs.
 | `Cmd+E` | Enter nav mode: the vertical tabs expand, and a cursor appears on the current tab |
 | `j` / `k` (or arrows) | Move the cursor down / up without switching tabs |
 | `gg` / `G` | Jump to the first / last tab |
-| `dd` / `Vd` | Close the tab under the cursor (stays in nav mode; cursor moves to the tab below) |
+| `dd` | Close the tab under the cursor (stays in nav mode; cursor moves to the tab below) |
+| `V` | Visual mode: `j`/`k`/`gg`/`G` highlight a range of tabs, `d` closes them all, `Esc` or `V` cancels |
 | `Enter` | Switch to the tab under the cursor and exit |
 | `Esc` / `Cmd+E` | Exit without switching |
 
